@@ -15,12 +15,15 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.text.Text;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.MultiMatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,6 +49,54 @@ public class EsServiceImpl {
         // 我们通过restHighLeveClient
         restHighLevelClient = new RestHighLevelClient(restClientBuilder);
     }
+
+    /**
+     * 设置高亮。
+     * 首先第一步在查询的时候这
+     * @param words
+     * @return
+     */
+    public List<Blog>  getHightLight(String words) throws IOException {
+        // 请求对象。
+        SearchRequest searchRequest = new SearchRequest(INDEX);
+        // 请求的builder
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        MultiMatchQueryBuilder multiMatchQueryBuilder = QueryBuilders.multiMatchQuery(words, "title", "content");
+        // 将查询条件构建到构建器中。
+        searchSourceBuilder.query(multiMatchQueryBuilder);
+        // 高亮设置
+        HighlightBuilder highlightBuilder = new HighlightBuilder();
+        highlightBuilder.field("title");
+        highlightBuilder.preTags("<em>");
+        highlightBuilder.postTags("</em>");
+        searchSourceBuilder.highlighter(highlightBuilder);
+
+        // 将查询条件设置到请求上。要不然他咋去查。
+        searchRequest.source(searchSourceBuilder);
+        // 发送查询请求
+        SearchResponse search = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
+        // 请求回来的记过如何获取请参照控制台发送请求到的结果。每个节点就对应一个get
+        SearchHit[] hits = search.getHits().getHits();
+        List<Blog> blogs = new ArrayList<>();
+        for(SearchHit hit :hits){
+            Map<String, HighlightField> highlightFields = hit.getHighlightFields();
+            HighlightField content = highlightFields.get("content");
+            HighlightField title = highlightFields.get("title");
+            String json = hit.getSourceAsString();
+            Blog blog = JSONObject.parseObject(json, Blog.class);
+            if(title!=null){
+                Text[] fragments = title.getFragments();
+                StringBuffer sb = new StringBuffer();
+                for(Text s :fragments){
+                    sb.append(s.toString());
+                }
+                blog.setTitle(sb.toString());
+            }
+            blogs.add(blog);
+        }
+        return blogs;
+    }
+
 
     /**
      * 通过scroll方式进查询，如果scrollId是空的时候我们需要进行第一次查询，第二次的是偶就会带着scrollId，这个时候一直下一页就行了。

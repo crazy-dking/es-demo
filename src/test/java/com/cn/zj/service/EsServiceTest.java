@@ -20,6 +20,12 @@ public class EsServiceTest {
     public void beforeTest(){
         esService = new EsServiceImpl();
     }
+
+    @Test
+    public void getHighLight() throws IOException {
+        List<Blog> jbw = esService.getHightLight("jbw");
+        System.out.println(jbw);
+    }
     @Test
     public void getScrollTest() throws IOException {
         Map<String, Object> map = esService.searchPageScroll("来", "DnF1ZXJ5VGhlbkZldGNoAgAAAAAAAADUFm9uUHJfN2hOUl82NTdWa2E5RWdtU3cAAAAAAAAA0xZvblByXzdoTlJfNjU3VmthOUVnbVN3", 1);
